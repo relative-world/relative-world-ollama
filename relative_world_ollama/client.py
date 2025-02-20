@@ -77,7 +77,7 @@ def fix_json_response(client: OllamaClient, bad_json: str, response_model: Type[
         model=settings.json_fix_model,
         prompt=bad_json,
         system=system_prompt,
-        keep_alive=settings.ollama_json_model_keep_alive,
+        keep_alive=settings.model_keep_alive,
     )
     try:
         return json.loads(response.response)
