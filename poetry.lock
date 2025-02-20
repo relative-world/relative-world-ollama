@@ -674,7 +674,7 @@ pydantic = "^2.10.6"
 type = "git"
 url = "git@192.168.1.45:TextWorld/relative-world.git"
 reference = "HEAD"
-resolved_reference = "76471445f36909404c5af1d8b28021110f86cf66"
+resolved_reference = "8964d880507b7b312b79f9f0adc5a26c03d03aea"
 
 [[package]]
 name = "requests"
