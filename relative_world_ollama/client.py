@@ -22,6 +22,12 @@ The structured output format should match this json schema:
 """
 
 
+def get_ollama_client():
+    return PydanticOllamaClient(
+        base_url=settings.base_url, default_model=settings.default_model
+    )
+
+
 def ollama_generate(client: OllamaClient, model: str, prompt: str, system: str) -> GenerateResponse | Iterator[
     GenerateResponse]:
     """
@@ -117,9 +123,3 @@ class PydanticOllamaClient:
             data = fix_json_response(self._client, response_text, response_model)
 
         return response_model.model_validate(data)
-
-
-def get_ollama_client():
-    return PydanticOllamaClient(
-        base_url=settings.base_url, default_model=settings.default_model
-    )
