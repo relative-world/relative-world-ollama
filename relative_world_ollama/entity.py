@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from relative_world.entity import Entity
 from relative_world.event import BoundEvent
-from relative_world_ollama.client import PydanticOllamaClient
+from relative_world_ollama.client import get_ollama_client
 from relative_world_ollama.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,7 @@ class OllamaEntity(Entity):
 
     @cached_property
     def ollama_client(self):
-        return PydanticOllamaClient(
-            base_url=settings.base_url, default_model=settings.default_model
-        )
+        return get_ollama_client()
 
     def get_prompt(self):
         raise NotImplementedError

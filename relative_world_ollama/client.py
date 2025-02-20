@@ -117,3 +117,9 @@ class PydanticOllamaClient:
             data = fix_json_response(self._client, response_text, response_model)
 
         return response_model.model_validate(data)
+
+
+def get_ollama_client():
+    return PydanticOllamaClient(
+        base_url=settings.base_url, default_model=settings.default_model
+    )
