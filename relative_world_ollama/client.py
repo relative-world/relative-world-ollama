@@ -74,7 +74,7 @@ def fix_json_response(client: OllamaClient, bad_json: str, response_model: Type[
     system_prompt = FIX_JSON_SYSTEM_PROMPT.format(response_model_json_schema=response_model_json_schema)
 
     response = client.generate(
-        model=settings.ollama_json_fix_model,
+        model=settings.json_fix_model,
         prompt=bad_json,
         system=system_prompt,
         keep_alive=settings.ollama_json_model_keep_alive,
