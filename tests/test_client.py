@@ -45,7 +45,7 @@ class TestPydanticOllamaClient(unittest.TestCase):
         mock_client = MockOllamaClient.return_value
         mock_client.generate.return_value = TestGenerateResponse(response='{"response": "value"}')
 
-        client = PydanticOllamaClient(settings.ollama_base_url, settings.ollama_default_model)
+        client = PydanticOllamaClient(settings.base_url, settings.default_model)
         response_model = TestGenerateResponse
         response = client.generate('test_prompt', 'test_system', response_model)
         self.assertEqual(response.response, 'value')
