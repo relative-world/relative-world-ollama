@@ -42,9 +42,7 @@ class OllamaEntity(Entity):
             response_model = BasicResponse
 
         response = self.ollama_client.generate(
-            prompt=rendered_prompt,
-            system=system_prompt,
-            response_model=response_model
+            prompt=rendered_prompt, system=system_prompt, response_model=response_model
         )
         if response and (event_iterator := self.handle_response(response)):
             yield from event_iterator

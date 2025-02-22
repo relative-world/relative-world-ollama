@@ -7,6 +7,7 @@ class OllamaSettings(BaseSettings):
     json_fix_model: str = "qwen2.5:14b"
     model_keep_alive: float = 300.0
 
-    model_config = SettingsConfigDict(env_prefix='relative_world_ollama_')
+    model_config = SettingsConfigDict(env_prefix="relative_world_ollama_")
+
 
 settings = OllamaSettings()

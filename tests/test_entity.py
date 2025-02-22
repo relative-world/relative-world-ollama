@@ -21,7 +21,7 @@ class TestOllamaEntityMethods(unittest.TestCase):
     def setUp(self):
         self.entity = TestOllamaEntity(name="Test Entity")
 
-    @patch('relative_world_ollama.entity.get_ollama_client')
+    @patch("relative_world_ollama.entity.get_ollama_client")
     def test_update(self, mock_get_ollama_client):
         mock_client = MagicMock()
         mock_client.generate.return_value = TestResponseModel(response="Test response")
@@ -31,7 +31,9 @@ class TestOllamaEntityMethods(unittest.TestCase):
         self.assertEqual(events, [])
 
     def test_get_system_prompt(self):
-        self.assertEqual(self.entity.get_system_prompt(), "You are a friendly AI assistant.")
+        self.assertEqual(
+            self.entity.get_system_prompt(), "You are a friendly AI assistant."
+        )
 
     def test_handle_response(self):
         response = TestResponseModel(response="Test response")
@@ -39,5 +41,5 @@ class TestOllamaEntityMethods(unittest.TestCase):
         self.assertEqual(events, [])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -22,7 +22,7 @@ The structured output format should match this json schema:
 """
 
 
-def get_ollama_client() -> 'PydanticOllamaClient':
+def get_ollama_client() -> "PydanticOllamaClient":
     """
     Create and return an instance of PydanticOllamaClient based on settings.
 
@@ -35,10 +35,7 @@ def get_ollama_client() -> 'PydanticOllamaClient':
 
 
 def ollama_generate(
-        client: OllamaClient,
-        model: str,
-        prompt: str,
-        system: str
+    client: OllamaClient, model: str, prompt: str, system: str
 ) -> GenerateResponse | Iterator[GenerateResponse]:
     """
     Generate a response from the Ollama client.
@@ -52,7 +49,10 @@ def ollama_generate(
     Returns:
         GenerateResponse | Iterator[GenerateResponse]: The generated response.
     """
-    logger.debug("ollama_generate::input", extra={"model": model, "prompt": prompt, "system": system})
+    logger.debug(
+        "ollama_generate::input",
+        extra={"model": model, "prompt": prompt, "system": system},
+    )
     response = client.generate(
         model=model,
         prompt=prompt,
@@ -64,9 +64,7 @@ def ollama_generate(
 
 
 def fix_json_response(
-        client: OllamaClient,
-        bad_json: str,
-        response_model: Type[BaseModel]
+    client: OllamaClient, bad_json: str, response_model: Type[BaseModel]
 ) -> dict:
     """
     Attempt to fix a malformed JSON response using the Ollama client.
@@ -82,9 +80,16 @@ def fix_json_response(
     Raises:
         UnparsableResponseError: If the JSON cannot be parsed even after fixing.
     """
-    logger.debug("fix_json_response::input", extra={"bad_json": bad_json, "response_model": response_model.__name__})
-    response_model_json_schema = json.dumps(response_model.model_json_schema(), indent=2)
-    system_prompt = FIX_JSON_SYSTEM_PROMPT.format(response_model_json_schema=response_model_json_schema)
+    logger.debug(
+        "fix_json_response::input",
+        extra={"bad_json": bad_json, "response_model": response_model.__name__},
+    )
+    response_model_json_schema = json.dumps(
+        response_model.model_json_schema(), indent=2
+    )
+    system_prompt = FIX_JSON_SYSTEM_PROMPT.format(
+        response_model_json_schema=response_model_json_schema
+    )
 
     response = client.generate(
         model=settings.json_fix_model,
@@ -118,11 +123,11 @@ class PydanticOllamaClient:
         self.default_model = default_model
 
     def generate(
-            self,
-            prompt: str,
-            system: str,
-            response_model: Type[BaseModel],
-            model: str | None = None
+        self,
+        prompt: str,
+        system: str,
+        response_model: Type[BaseModel],
+        model: str | None = None,
     ) -> BaseModel:
         """
         Generate a response from Ollama API and validate it against a Pydantic model.
@@ -142,17 +147,14 @@ class PydanticOllamaClient:
         """
         output_schema = json.dumps(response_model.model_json_schema())
         system_message = (
-                system +
-                "\n\nThe structured output format should match this json schema:\n\n```\n" +
-                output_schema +
-                "\n```"
+            system
+            + "\n\nThe structured output format should match this json schema:\n\n```\n"
+            + output_schema
+            + "\n```"
         )
 
         response = ollama_generate(
-            self._client,
-            model or self.default_model,
-            prompt,
-            system_message
+            self._client, model or self.default_model, prompt, system_message
         )
         response_text = response.response
 
