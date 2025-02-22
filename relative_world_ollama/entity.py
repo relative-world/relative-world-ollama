@@ -16,7 +16,6 @@ class BasicResponse(BaseModel):
 
 
 class OllamaEntity(Entity):
-    name: str
     model: str | None = None
     event_queue: Annotated[list[BoundEvent], PrivateAttr()] = []
     response_model: ClassVar[Type[BaseModel]] = BasicResponse
