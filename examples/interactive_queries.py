@@ -1,3 +1,4 @@
+import asyncio
 from relative_world.entity import Entity
 from relative_world.event import Event
 from relative_world.world import RelativeWorld
@@ -12,18 +13,19 @@ class QueryEvent(Event):
 class QueryActor(Entity):
     name: str = "You"
 
-    def update(self):
+    async def update(self):
         # Emit a QueryEvent based on user input.
         user_input = input("Enter your query (or press Enter to skip): ")
         if user_input.strip():
             self.emit_event(QueryEvent(query=user_input.strip()))
         # Yield any output from the base class update (if any)
-        yield from super().update()
+        async for event in super().update():
+            yield event
 
-    def handle_event(self, entity, event):
+    async def handle_event(self, entity, event):
         # When a ResponseEvent is handled, print it.
-        yield from super().handle_event(entity, event)
-
+        print(f"{self.name}: {event.query}")
+        return await super().handle_event(entity, event)
 
 class QueryResponder(OllamaEntity):
     name: str = "Query Responder"
@@ -35,10 +37,11 @@ class QueryResponder(OllamaEntity):
         # Store the latest query to use as a prompt.
         self._current_query = None
 
-    def handle_event(self, entity, event):
+    async def handle_event(self, entity, event):
         # Accept a QueryEvent which contains the user query.
         if isinstance(event, QueryEvent):
             self._current_query = event.query
+        return await super().handle_event(entity, event)
 
     def get_prompt(self):
         # Use the current query if available; otherwise, supply a default prompt.
@@ -48,12 +51,14 @@ class QueryResponder(OllamaEntity):
             return prompt
         return "<No query>"
 
-    def handle_response(self, response: BasicResponse):
+    async def handle_response(self, response: BasicResponse):
         # Print the response from the Ollama API.
         print(f"{self.name}: {response.text}")
+        # Call the super method to flush the events
+        async for event in super().handle_response(response):
+            yield event
 
-
-def main():
+async def main():
     # Create actor and responder for handling interactive queries.
     query_actor = QueryActor()
     query_responder = QueryResponder()
@@ -65,12 +70,10 @@ def main():
     try:
         # Run a continuous update loop.
         while True:
-            # Updates may yield events which are processed internally.
-            # Use list() to force the generator to run to completion, which will complete the simulation cycle.
-            list(world.update())
+            await world.step()
     except KeyboardInterrupt:
         print("\nExiting simulation.")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

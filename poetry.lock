@@ -751,7 +751,7 @@ cli = ["click (>=5.0)"]
 
 [[package]]
 name = "relative-world"
-version = "0.1.0"
+version = "1.0.0"
 description = ""
 optional = false
 python-versions = "^3.12"
@@ -766,7 +766,7 @@ pydantic = "^2.10.6"
 type = "git"
 url = "https://github.com/relative-world/relative-world.git"
 reference = "HEAD"
-resolved_reference = "22e46ad939099f8d7b9588e02cf85e6f475f61d2"
+resolved_reference = "248cf2f58034e6372d43759b44977ef1d180c918"
 
 [[package]]
 name = "requests"

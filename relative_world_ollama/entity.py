@@ -2,7 +2,6 @@ import logging
 from functools import cached_property
 from typing import ClassVar, Type, Annotated
 
-import orjson as json
 from pydantic import BaseModel, PrivateAttr
 
 from relative_world.entity import Entity, BoundEvent
@@ -30,7 +29,7 @@ class OllamaEntity(Entity):
     def get_system_prompt(self):
         return "You are a friendly AI assistant."
 
-    def update(self):
+    async def update(self):
         rendered_prompt = self.get_prompt()
         system_prompt = self.get_system_prompt()
         logger.debug("Prompt: %s", rendered_prompt)
@@ -41,13 +40,17 @@ class OllamaEntity(Entity):
         except AttributeError:
             response_model = BasicResponse
 
-        response = self.ollama_client.generate(
+        response = await self.ollama_client.generate(
             prompt=rendered_prompt, system=system_prompt, response_model=response_model
         )
         if response and (event_iterator := self.handle_response(response)):
-            yield from event_iterator
+            async for event in event_iterator:
+                yield event
 
-        yield from super().update()
+        async for event in super().update():
+            yield event
 
-    def handle_response(self, response: BaseModel):
-        yield from ()
+    async def handle_response(self, response: BaseModel):
+        for event in []:
+            yield event
+

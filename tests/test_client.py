@@ -1,6 +1,7 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from pydantic import BaseModel
+import asyncio
 
 from relative_world_ollama.client import (
     ollama_generate,
@@ -15,55 +16,55 @@ class TestGenerateResponse(BaseModel):
     response: str
 
 
-class TestClientFunctions(unittest.TestCase):
+class TestClientFunctions(unittest.IsolatedAsyncioTestCase):
 
-    @patch("relative_world_ollama.client.OllamaClient")
-    def test_ollama_generate(self, MockOllamaClient):
-        mock_client = MockOllamaClient.return_value
-        mock_client.generate.return_value = TestGenerateResponse(
+    @patch("relative_world_ollama.client.AsyncOllamaClient")
+    async def test_ollama_generate(self, MockAsyncOllamaClient):
+        mock_client = MockAsyncOllamaClient.return_value
+        mock_client.generate = AsyncMock(return_value=TestGenerateResponse(
             response='{"key": "value"}'
-        )
+        ))
 
-        response = ollama_generate(
+        response = await ollama_generate(
             mock_client, "test_model", "test_prompt", "test_system"
         )
         self.assertEqual(response.response, '{"key": "value"}')
 
-    @patch("relative_world_ollama.client.OllamaClient")
-    def test_fix_json_response(self, MockOllamaClient):
-        mock_client = MockOllamaClient.return_value
-        mock_client.generate.return_value = TestGenerateResponse(
+    @patch("relative_world_ollama.client.AsyncOllamaClient")
+    async def test_fix_json_response(self, MockAsyncOllamaClient):
+        mock_client = MockAsyncOllamaClient.return_value
+        mock_client.generate = AsyncMock(return_value=TestGenerateResponse(
             response='{"fixed_key": "fixed_value"}'
-        )
+        ))
 
         response_model = TestGenerateResponse
-        fixed_json = fix_json_response(
+        fixed_json = await fix_json_response(
             mock_client, '{"bad_json": "value"}', response_model
         )
         self.assertEqual(fixed_json, {"fixed_key": "fixed_value"})
 
-    @patch("relative_world_ollama.client.OllamaClient")
-    def test_fix_json_response_error(self, MockOllamaClient):
-        mock_client = MockOllamaClient.return_value
-        mock_client.generate.return_value = TestGenerateResponse(response="bad_json")
+    @patch("relative_world_ollama.client.AsyncOllamaClient")
+    async def test_fix_json_response_error(self, MockAsyncOllamaClient):
+        mock_client = MockAsyncOllamaClient.return_value
+        mock_client.generate = AsyncMock(return_value=TestGenerateResponse(response="bad_json"))
 
         response_model = TestGenerateResponse
         with self.assertRaises(UnparsableResponseError):
-            fix_json_response(mock_client, "bad_json", response_model)
+            await fix_json_response(mock_client, "bad_json", response_model)
 
 
-class TestPydanticOllamaClient(unittest.TestCase):
+class TestPydanticOllamaClient(unittest.IsolatedAsyncioTestCase):
 
-    @patch("relative_world_ollama.client.OllamaClient")
-    def test_generate(self, MockOllamaClient):
-        mock_client = MockOllamaClient.return_value
-        mock_client.generate.return_value = TestGenerateResponse(
+    @patch("relative_world_ollama.client.AsyncOllamaClient")
+    async def test_generate(self, MockAsyncOllamaClient):
+        mock_client = MockAsyncOllamaClient.return_value
+        mock_client.generate = AsyncMock(return_value=TestGenerateResponse(
             response='{"response": "value"}'
-        )
+        ))
 
         client = PydanticOllamaClient(settings.base_url, settings.default_model)
         response_model = TestGenerateResponse
-        response = client.generate("test_prompt", "test_system", response_model)
+        response = await client.generate("test_prompt", "test_system", response_model)
         self.assertEqual(response.response, "value")
 
 

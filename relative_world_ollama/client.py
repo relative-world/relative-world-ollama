@@ -1,8 +1,8 @@
 import json
 import logging
-from typing import Type, Iterator
+from typing import Type, AsyncIterator
 
-from ollama import Client as OllamaClient, GenerateResponse
+from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
 from pydantic import BaseModel
 
 from relative_world_ollama.exceptions import UnparsableResponseError
@@ -21,7 +21,6 @@ The structured output format should match this json schema:
 ```
 """
 
-
 def get_ollama_client() -> "PydanticOllamaClient":
     """
     Create and return an instance of PydanticOllamaClient based on settings.
@@ -33,27 +32,26 @@ def get_ollama_client() -> "PydanticOllamaClient":
         base_url=settings.base_url, default_model=settings.default_model
     )
 
-
-def ollama_generate(
-    client: OllamaClient, model: str, prompt: str, system: str
-) -> GenerateResponse | Iterator[GenerateResponse]:
+async def ollama_generate(
+    client: AsyncOllamaClient, model: str, prompt: str, system: str
+) -> GenerateResponse | AsyncIterator[GenerateResponse]:
     """
     Generate a response from the Ollama client.
 
     Args:
-        client (OllamaClient): The Ollama client instance.
+        client (AsyncOllamaClient): The Ollama client instance.
         model (str): The model name to use.
         prompt (str): The prompt for generation.
         system (str): The system context for generation.
 
     Returns:
-        GenerateResponse | Iterator[GenerateResponse]: The generated response.
+        GenerateResponse | AsyncIterator[GenerateResponse]: The generated response.
     """
     logger.debug(
         "ollama_generate::input",
         extra={"model": model, "prompt": prompt, "system": system},
     )
-    response = client.generate(
+    response = await client.generate(
         model=model,
         prompt=prompt,
         system=system,
@@ -62,15 +60,14 @@ def ollama_generate(
     logger.debug("ollama_generate::output", extra={"response": response})
     return response
 
-
-def fix_json_response(
-    client: OllamaClient, bad_json: str, response_model: Type[BaseModel]
+async def fix_json_response(
+    client: AsyncOllamaClient, bad_json: str, response_model: Type[BaseModel]
 ) -> dict:
     """
     Attempt to fix a malformed JSON response using the Ollama client.
 
     Args:
-        client (OllamaClient): The Ollama client instance.
+        client (AsyncOllamaClient): The Ollama client instance.
         bad_json (str): The malformed JSON string.
         response_model (Type[BaseModel]): The Pydantic model against which the JSON is validated.
 
@@ -91,7 +88,7 @@ def fix_json_response(
         response_model_json_schema=response_model_json_schema
     )
 
-    response = client.generate(
+    response = await client.generate(
         model=settings.json_fix_model,
         prompt=bad_json,
         system=system_prompt,
@@ -101,7 +98,6 @@ def fix_json_response(
         return json.loads(response.response)
     except json.JSONDecodeError as exc:
         raise UnparsableResponseError(bad_json) from exc
-
 
 class PydanticOllamaClient:
     """
@@ -119,10 +115,10 @@ class PydanticOllamaClient:
             base_url (str): The base URL for the Ollama API.
             default_model (str): The default model name for generation.
         """
-        self._client = OllamaClient(host=base_url)
+        self._client = AsyncOllamaClient(host=base_url)
         self.default_model = default_model
 
-    def generate(
+    async def generate(
         self,
         prompt: str,
         system: str,
@@ -153,7 +149,7 @@ class PydanticOllamaClient:
             + "\n```"
         )
 
-        response = ollama_generate(
+        response = await ollama_generate(
             self._client, model or self.default_model, prompt, system_message
         )
         response_text = response.response
@@ -161,6 +157,6 @@ class PydanticOllamaClient:
         try:
             data = json.loads(response_text)
         except json.JSONDecodeError:
-            data = fix_json_response(self._client, response_text, response_model)
+            data = await fix_json_response(self._client, response_text, response_model)
 
         return response_model.model_validate(data)

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, AsyncMock
 from pydantic import BaseModel
 
 from relative_world_ollama.entity import OllamaEntity
@@ -16,28 +16,28 @@ class TestOllamaEntity(OllamaEntity):
         return "Test prompt"
 
 
-class TestOllamaEntityMethods(unittest.TestCase):
+class TestOllamaEntityMethods(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self.entity = TestOllamaEntity(name="Test Entity")
 
     @patch("relative_world_ollama.entity.get_ollama_client")
-    def test_update(self, mock_get_ollama_client):
-        mock_client = MagicMock()
-        mock_client.generate.return_value = TestResponseModel(response="Test response")
+    async def test_update(self, mock_get_ollama_client):
+        mock_client = AsyncMock()
+        mock_client.generate = AsyncMock(return_value=TestResponseModel(response="Test response"))
         mock_get_ollama_client.return_value = mock_client
 
-        events = list(self.entity.update())
+        events = [event async for event in self.entity.update()]
         self.assertEqual(events, [])
 
-    def test_get_system_prompt(self):
+    async def test_get_system_prompt(self):
         self.assertEqual(
             self.entity.get_system_prompt(), "You are a friendly AI assistant."
         )
 
-    def test_handle_response(self):
+    async def test_handle_response(self):
         response = TestResponseModel(response="Test response")
-        events = list(self.entity.handle_response(response))
+        events = [event async for event in self.entity.handle_response(response)]
         self.assertEqual(events, [])
 
 
