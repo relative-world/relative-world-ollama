@@ -7,10 +7,10 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-relative-world = {git = "git@192.168.1.45:TextWorld/relative-world.git"}
 pydantic = "^2.10.6"
 pydantic-settings = "^2.7.1"
 ollama = "^0.4.7"
+relative-world = {git = "https://github.com/relative-world/relative-world.git"}
 
 
 [tool.poetry.group.dev.dependencies]
