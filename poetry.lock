@@ -766,7 +766,7 @@ pydantic = "^2.10.6"
 type = "git"
 url = "https://github.com/relative-world/relative-world.git"
 reference = "HEAD"
-resolved_reference = "5f5a818471d347eaff468d7d55b83e719a85d5b9"
+resolved_reference = "22e46ad939099f8d7b9588e02cf85e6f475f61d2"
 
 [[package]]
 name = "requests"
