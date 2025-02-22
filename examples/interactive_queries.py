@@ -54,9 +54,7 @@ class QueryResponder(OllamaEntity):
     async def handle_response(self, response: BasicResponse):
         # Print the response from the Ollama API.
         print(f"{self.name}: {response.text}")
-        # Call the super method to flush the events
-        async for event in super().handle_response(response):
-            yield event
+
 
 async def main():
     # Create actor and responder for handling interactive queries.

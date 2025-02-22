@@ -43,14 +43,10 @@ class OllamaEntity(Entity):
         response = await self.ollama_client.generate(
             prompt=rendered_prompt, system=system_prompt, response_model=response_model
         )
-        if response and (event_iterator := self.handle_response(response)):
-            async for event in event_iterator:
-                yield event
+        await self.handle_response(response)
 
         async for event in super().update():
             yield event
 
-    async def handle_response(self, response: BaseModel):
-        for event in []:
-            yield event
-
+    async def handle_response(self, response: BaseModel) -> None:
+        pass
