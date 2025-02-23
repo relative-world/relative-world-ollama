@@ -1,5 +1,5 @@
 import logging
-from typing import Type, AsyncIterator
+from typing import Type, AsyncIterator, re
 
 import orjson
 from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
@@ -16,10 +16,20 @@ Please ensure the user input matches the expected json format and output the cor
 If the input does not match the structure, attempt to re-structure it to match the expected format, 
 if that can be done without adding information.
 
+Only respond with json content, any text outside of the structure will break the system.
 The structured output format should match this json schema:
 
 {response_model_json_schema}
 """
+
+def maybe_parse_json(content):
+    try:
+        return orjson.loads(content)
+    except orjson.JSONDecodeError:
+        markdown_pattern = '```json\n(.*)\n```'
+        match = re.search(markdown_pattern, content, re.DOTALL)
+        if match:
+            return orjson.loads(match.group(1))
 
 
 def inline_json_schema_defs(schema):
@@ -114,7 +124,7 @@ async def fix_json_response(
         keep_alive=settings.model_keep_alive,
     )
     try:
-        return orjson.loads(response.response)
+        return maybe_parse_json(response.response)
     except orjson.JSONDecodeError as exc:
         raise UnparsableResponseError(bad_json) from exc
 
@@ -171,7 +181,7 @@ class PydanticOllamaClient:
         response_text = response.response
 
         try:
-            data = orjson.loads(response_text)
+            data = maybe_parse_json(response_text)
         except orjson.JSONDecodeError:
             data = await fix_json_response(self._client, response_text, response_model)
 
