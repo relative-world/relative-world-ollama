@@ -26,12 +26,15 @@ The structured output format should match this json schema:
 def maybe_parse_json(content):
     try:
         return orjson.loads(content)
-    except orjson.JSONDecodeError:
-        markdown_pattern = '```json\n(.*)\n```'
+    except orjson.JSONDecodeError as exc:
+        markdown_pattern = '```json(.*)```'
         match = re.search(markdown_pattern, content, re.DOTALL)
         if match:
-            return orjson.loads(match.group(1))
-
+            try:
+                return orjson.loads(match.group(1))
+            except orjson.JSONDecodeError as exc2:
+                raise exc2 from exc
+        raise exc
 
 def inline_json_schema_defs(schema):
     """Recursively replace $ref references with their definitions from $defs."""
