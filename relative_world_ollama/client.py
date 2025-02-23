@@ -1,56 +1,16 @@
 import logging
-import re
 from typing import Type, AsyncIterator
 
 import orjson
 from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
 from pydantic import BaseModel
 
-from relative_world_ollama.exceptions import UnparsableResponseError
+from relative_world_ollama.json import maybe_parse_json, inline_json_schema_defs, fix_json_response
 from relative_world_ollama.settings import settings
+from relative_world_ollama.tools import TOOL_CALLING_SYSTEM_PROMPT, ToolCallRequestContainer, call_tool, \
+    ToolCallResponse
 
 logger = logging.getLogger(__name__)
-
-FIX_JSON_SYSTEM_PROMPT = """
-You are a friendly AI assistant. Your task is to fix poorly formatted json.
-Please ensure the user input matches the expected json format and output the corrected structure.
-If the input does not match the structure, attempt to re-structure it to match the expected format, 
-if that can be done without adding information.
-
-Only respond with json content, any text outside of the structure will break the system.
-The structured output format should match this json schema:
-
-{response_model_json_schema}
-"""
-
-def maybe_parse_json(content):
-    try:
-        return orjson.loads(content)
-    except orjson.JSONDecodeError as exc:
-        markdown_pattern = '```json(.*)```'
-        match = re.search(markdown_pattern, content, re.DOTALL)
-        if match:
-            try:
-                return orjson.loads(match.group(1))
-            except orjson.JSONDecodeError as exc2:
-                raise exc2 from exc
-        raise exc
-
-def inline_json_schema_defs(schema):
-    """Recursively replace $ref references with their definitions from $defs."""
-    defs = schema.pop("$defs", {})
-
-    def resolve_refs(obj):
-        if isinstance(obj, dict):
-            if "$ref" in obj:
-                ref_key = obj["$ref"].split("/")[-1]
-                return resolve_refs(defs.get(ref_key, {}))
-            return {k: resolve_refs(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [resolve_refs(item) for item in obj]
-        return obj
-
-    return resolve_refs(schema)
 
 
 def get_ollama_client() -> "PydanticOllamaClient":
@@ -66,7 +26,11 @@ def get_ollama_client() -> "PydanticOllamaClient":
 
 
 async def ollama_generate(
-        client: AsyncOllamaClient, model: str, prompt: str, system: str
+        client: AsyncOllamaClient,
+        model: str,
+        prompt: str,
+        system: str,
+        context: list[int] | None = None,
 ) -> GenerateResponse | AsyncIterator[GenerateResponse]:
     """
     Generate a response from the Ollama client.
@@ -88,49 +52,11 @@ async def ollama_generate(
         model=model,
         prompt=prompt,
         system=system,
+        context=context,
         keep_alive=settings.model_keep_alive,
     )
     logger.debug("ollama_generate::output", extra={"response": response})
     return response
-
-
-async def fix_json_response(
-        client: AsyncOllamaClient, bad_json: str, response_model: Type[BaseModel]
-) -> dict:
-    """
-    Attempt to fix a malformed JSON response using the Ollama client.
-
-    Args:
-        client (AsyncOllamaClient): The Ollama client instance.
-        bad_json (str): The malformed JSON string.
-        response_model (Type[BaseModel]): The Pydantic model against which the JSON is validated.
-
-    Returns:
-        dict: The corrected JSON structure.
-
-    Raises:
-        UnparsableResponseError: If the JSON cannot be parsed even after fixing.
-    """
-    logger.debug(
-        "fix_json_response::input",
-        extra={"bad_json": bad_json, "response_model": response_model.__name__},
-    )
-    response_model_json_schema = orjson.dumps(
-        inline_json_schema_defs(response_model.model_json_schema())).decode('utf-8')
-    system_prompt = FIX_JSON_SYSTEM_PROMPT.format(
-        response_model_json_schema=response_model_json_schema
-    )
-
-    response = await client.generate(
-        model=settings.json_fix_model,
-        prompt=bad_json,
-        system=system_prompt,
-        keep_alive=settings.model_keep_alive,
-    )
-    try:
-        return maybe_parse_json(response.response)
-    except orjson.JSONDecodeError as exc:
-        raise UnparsableResponseError(bad_json) from exc
 
 
 class PydanticOllamaClient:
@@ -158,7 +84,10 @@ class PydanticOllamaClient:
             system: str,
             response_model: Type[BaseModel],
             model: str | None = None,
-    ) -> BaseModel:
+            tools: list[dict] | None = None,
+            previous_tool_invocations: list[ToolCallResponse] | None = None,
+            context: list[int] | None = None,
+    ) -> tuple[GenerateResponse | AsyncIterator[GenerateResponse], BaseModel]:
         """
         Generate a response from Ollama API and validate it against a Pydantic model.
 
@@ -175,12 +104,30 @@ class PydanticOllamaClient:
         Returns:
             BaseModel: The validated response model.
         """
-        output_schema = orjson.dumps(inline_json_schema_defs(response_model.model_json_schema())).decode('utf-8')
-        system_message = (f"{system}\n\nOnly respond with json content, any text outside of the structure will break the system. "
-                          f"The structured output format should match this json schema:\n{output_schema}.")
+        output_schema = orjson.dumps(
+            inline_json_schema_defs(response_model.model_json_schema())
+        ).decode("utf-8")
+
+        ToolCallRequestContainer
+
+        system_message = ""
+        if tools:
+            system_message = TOOL_CALLING_SYSTEM_PROMPT.format(
+                tool_definitions_json=orjson.dumps(tools).decode("utf-8"),
+                previous_tool_invocations=orjson.dumps(previous_tool_invocations).decode("utf-8"),
+            )
+
+        system_message += (
+            f"\n{system}\n\nOnly respond with json content, any text outside of the structure will break the system. "
+            f"Unless making a tool call, the structured output format should match this json schema:\n{output_schema}."
+        )
 
         response = await ollama_generate(
-            self._client, model or self.default_model, prompt, system_message
+            client=self._client,
+            model=model or self.default_model,
+            prompt=prompt,
+            system=system_message,
+            context=context,
         )
         response_text = response.response
 
@@ -189,4 +136,21 @@ class PydanticOllamaClient:
         except orjson.JSONDecodeError:
             data = await fix_json_response(self._client, response_text, response_model)
 
-        return response_model.model_validate(data)
+        try:
+            tool_requests = ToolCallRequestContainer.model_validate(data)
+        except ValueError:
+            return response, response_model.model_validate(data)
+        else:
+            tool_call_results = [call_tool(tools, tool_call) for tool_call in tool_requests.tool_calls]
+            previous_tool_invocations.extend(tool_call_results)
+            return await self.generate(
+                prompt=prompt,
+                system=system,
+                response_model=response_model,
+                model=model,
+                tools=tools,
+                previous_tool_invocations=previous_tool_invocations,
+                context=context,
+            )
+
+

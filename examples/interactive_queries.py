@@ -27,6 +27,7 @@ class QueryActor(Entity):
         print(f"{self.name}: {event.query}")
         return await super().handle_event(entity, event)
 
+
 class QueryResponder(OllamaEntity):
     name: str = "Query Responder"
 

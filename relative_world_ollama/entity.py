@@ -17,6 +17,7 @@ class BasicResponse(BaseModel):
 class OllamaEntity(Entity):
     model: str | None = None
     event_queue: Annotated[list[BoundEvent], PrivateAttr()] = []
+    _context: Annotated[list[int] | None, PrivateAttr()] = None
     response_model: ClassVar[Type[BaseModel]] = BasicResponse
 
     @cached_property
@@ -40,9 +41,13 @@ class OllamaEntity(Entity):
         except AttributeError:
             response_model = BasicResponse
 
-        response = await self.ollama_client.generate(
-            prompt=rendered_prompt, system=system_prompt, response_model=response_model
+        raw_response, response = await self.ollama_client.generate(
+            prompt=rendered_prompt,
+            system=system_prompt,
+            response_model=response_model,
+            context=self._context,
         )
+        self._context = raw_response.context
         await self.handle_response(response)
 
         async for event in super().update():
