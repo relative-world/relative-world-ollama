@@ -1,5 +1,6 @@
 import logging
-from typing import Type, AsyncIterator, re
+import re
+from typing import Type, AsyncIterator
 
 import orjson
 from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
