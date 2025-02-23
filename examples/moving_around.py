@@ -1,11 +1,12 @@
 import asyncio
 import uuid
 from typing import List, Annotated
+
 from pydantic import BaseModel, PrivateAttr
 
 from relative_world.actor import Actor
-from relative_world.world import RelativeWorld
 from relative_world.location import Location
+from relative_world.world import RelativeWorld
 from relative_world_ollama.client import PydanticOllamaClient
 from relative_world_ollama.settings import settings
 
@@ -16,11 +17,9 @@ class MovementEvent(BaseModel):
     to_location: str
 
 
-class LocationDescription(BaseModel):
-    id: str
-    name: str
+class DescribedLocation(Location):
     description: str
-    connected_locations: List[str]
+    connected_locations: List[str] = []
 
 
 class MovementDecision(BaseModel):
@@ -48,7 +47,7 @@ class WanderingActor(Actor):
             "connected_locations": [str(loc.id) for loc in connections]
         }
 
-    async def decide_movement(self, current_info: LocationDescription) -> MovementDecision:
+    async def decide_movement(self, current_info: DescribedLocation) -> MovementDecision:
         prompt = f"""
         You are {self.name}, currently in location: {current_info.name}.
         Description: {current_info.description}
@@ -66,7 +65,7 @@ class WanderingActor(Actor):
 
     async def act(self):
         if self.location_id:
-            current_info = LocationDescription(**self.get_location_info(self.location_id))
+            current_info = DescribedLocation(**self.get_location_info(self.location_id))
             decision = await self.decide_movement(current_info)
 
             if decision.should_move and decision.target_location:
@@ -88,17 +87,17 @@ async def main():
 
     # Create locations
     locations = {
-        "garden": Location(
+        "garden": DescribedLocation(
             id=uuid.uuid4(),
             name="Garden",
             description="A beautiful garden with flowers and trees"
         ),
-        "house": Location(
+        "house": DescribedLocation(
             id=uuid.uuid4(),
             name="House",
             description="A cozy house with many rooms"
         ),
-        "market": Location(
+        "market": DescribedLocation(
             id=uuid.uuid4(),
             name="Market",
             description="A busy marketplace with various vendors"
