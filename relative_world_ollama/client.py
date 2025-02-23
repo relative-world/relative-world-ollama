@@ -1,7 +1,7 @@
-import json
 import logging
 from typing import Type, AsyncIterator
 
+import orjson
 from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
 from pydantic import BaseModel
 
@@ -13,13 +13,31 @@ logger = logging.getLogger(__name__)
 FIX_JSON_SYSTEM_PROMPT = """
 You are a friendly AI assistant. Your task is to fix poorly formatted json.
 Please ensure the user input matches the expected json format and output the corrected structure.
+If the input does not match the structure, attempt to re-structure it to match the expected format, 
+if that can be done without adding information.
 
 The structured output format should match this json schema:
 
-```
 {response_model_json_schema}
-```
 """
+
+
+def inline_json_schema_defs(schema):
+    """Recursively replace $ref references with their definitions from $defs."""
+    defs = schema.pop("$defs", {})
+
+    def resolve_refs(obj):
+        if isinstance(obj, dict):
+            if "$ref" in obj:
+                ref_key = obj["$ref"].split("/")[-1]
+                return resolve_refs(defs.get(ref_key, {}))
+            return {k: resolve_refs(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [resolve_refs(item) for item in obj]
+        return obj
+
+    return resolve_refs(schema)
+
 
 def get_ollama_client() -> "PydanticOllamaClient":
     """
@@ -32,8 +50,9 @@ def get_ollama_client() -> "PydanticOllamaClient":
         base_url=settings.base_url, default_model=settings.default_model
     )
 
+
 async def ollama_generate(
-    client: AsyncOllamaClient, model: str, prompt: str, system: str
+        client: AsyncOllamaClient, model: str, prompt: str, system: str
 ) -> GenerateResponse | AsyncIterator[GenerateResponse]:
     """
     Generate a response from the Ollama client.
@@ -60,8 +79,9 @@ async def ollama_generate(
     logger.debug("ollama_generate::output", extra={"response": response})
     return response
 
+
 async def fix_json_response(
-    client: AsyncOllamaClient, bad_json: str, response_model: Type[BaseModel]
+        client: AsyncOllamaClient, bad_json: str, response_model: Type[BaseModel]
 ) -> dict:
     """
     Attempt to fix a malformed JSON response using the Ollama client.
@@ -81,9 +101,8 @@ async def fix_json_response(
         "fix_json_response::input",
         extra={"bad_json": bad_json, "response_model": response_model.__name__},
     )
-    response_model_json_schema = json.dumps(
-        response_model.model_json_schema(), indent=2
-    )
+    response_model_json_schema = orjson.dumps(
+        inline_json_schema_defs(response_model.model_json_schema())).decode('utf-8')
     system_prompt = FIX_JSON_SYSTEM_PROMPT.format(
         response_model_json_schema=response_model_json_schema
     )
@@ -95,9 +114,10 @@ async def fix_json_response(
         keep_alive=settings.model_keep_alive,
     )
     try:
-        return json.loads(response.response)
-    except json.JSONDecodeError as exc:
+        return orjson.loads(response.response)
+    except orjson.JSONDecodeError as exc:
         raise UnparsableResponseError(bad_json) from exc
+
 
 class PydanticOllamaClient:
     """
@@ -119,11 +139,11 @@ class PydanticOllamaClient:
         self.default_model = default_model
 
     async def generate(
-        self,
-        prompt: str,
-        system: str,
-        response_model: Type[BaseModel],
-        model: str | None = None,
+            self,
+            prompt: str,
+            system: str,
+            response_model: Type[BaseModel],
+            model: str | None = None,
     ) -> BaseModel:
         """
         Generate a response from Ollama API and validate it against a Pydantic model.
@@ -141,13 +161,9 @@ class PydanticOllamaClient:
         Returns:
             BaseModel: The validated response model.
         """
-        output_schema = json.dumps(response_model.model_json_schema())
-        system_message = (
-            system
-            + "\n\nThe structured output format should match this json schema:\n\n```\n"
-            + output_schema
-            + "\n```"
-        )
+        output_schema = orjson.dumps(inline_json_schema_defs(response_model.model_json_schema())).decode('utf-8')
+        system_message = (f"{system}\n\nOnly respond with json content, any text outside of the structure will break the system. "
+                          f"The structured output format should match this json schema:\n{output_schema}.")
 
         response = await ollama_generate(
             self._client, model or self.default_model, prompt, system_message
@@ -155,8 +171,8 @@ class PydanticOllamaClient:
         response_text = response.response
 
         try:
-            data = json.loads(response_text)
-        except json.JSONDecodeError:
+            data = orjson.loads(response_text)
+        except orjson.JSONDecodeError:
             data = await fix_json_response(self._client, response_text, response_model)
 
         return response_model.model_validate(data)
