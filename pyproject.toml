@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "relative-world-ollama"
-version = "2.0.0"
+version = "2.0.1"
 description = ""
 authors = ["Tyler Evans <tyler@poorlythoughtout.com>"]
 readme = "README.md"
