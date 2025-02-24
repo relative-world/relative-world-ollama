@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "relative-world-ollama"
-version = "1.0.1"
+version = "2.0.1"
 description = ""
 authors = ["Tyler Evans <tyler@poorlythoughtout.com>"]
 readme = "README.md"
@@ -10,7 +10,6 @@ python = "^3.12"
 pydantic = "^2.10.6"
 pydantic-settings = "^2.7.1"
 ollama = "^0.4.7"
-relative-world = {git = "https://github.com/relative-world/relative-world.git"}
 
 
 [tool.poetry.group.dev.dependencies]
@@ -19,6 +18,7 @@ pytest = "^8.3.4"
 sphinx = "^8.2.0"
 ruff = "^0.9.7"
 parameterized = "^0.9.0"
+pytest-coverage = "^0.0"
 
 [build-system]
 requires = ["poetry-core"]
