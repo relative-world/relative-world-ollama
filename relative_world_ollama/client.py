@@ -5,10 +5,11 @@ import orjson
 from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
 from pydantic import BaseModel
 
+from relative_world_ollama.responses import BasicResponse
 from relative_world_ollama.json import maybe_parse_json, inline_json_schema_defs, fix_json_response
 from relative_world_ollama.settings import settings
 from relative_world_ollama.tools import TOOL_CALLING_SYSTEM_PROMPT, ToolCallRequestContainer, call_tool, \
-    ToolCallResponse
+    ToolCallResponse, ToolDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,9 @@ class PydanticOllamaClient:
             self,
             prompt: str,
             system: str,
-            response_model: Type[BaseModel],
+            response_model: Type[BaseModel] = BasicResponse,
             model: str | None = None,
-            tools: list[dict] | None = None,
+            tools: list[ToolDefinition] | None = None,
             previous_tool_invocations: list[ToolCallResponse] | None = None,
             context: list[int] | None = None,
     ) -> tuple[GenerateResponse | AsyncIterator[GenerateResponse], BaseModel]:
@@ -104,17 +105,16 @@ class PydanticOllamaClient:
         Returns:
             BaseModel: The validated response model.
         """
+        previous_tool_invocations = previous_tool_invocations or []
         output_schema = orjson.dumps(
             inline_json_schema_defs(response_model.model_json_schema())
         ).decode("utf-8")
 
-        ToolCallRequestContainer
-
         system_message = ""
         if tools:
             system_message = TOOL_CALLING_SYSTEM_PROMPT.format(
-                tool_definitions_json=orjson.dumps(tools).decode("utf-8"),
-                previous_tool_invocations=orjson.dumps(previous_tool_invocations).decode("utf-8"),
+                tool_definitions_json=orjson.dumps({name: tool.model_dump() for name, tool in tools.items()}).decode("utf-8"),
+                previous_tool_invocations=orjson.dumps([tc.model_dump() for tc in previous_tool_invocations]).decode("utf-8"),
             )
 
         system_message += (

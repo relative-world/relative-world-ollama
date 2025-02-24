@@ -2,7 +2,8 @@ import asyncio
 from relative_world.entity import Entity
 from relative_world.event import Event
 from relative_world.world import RelativeWorld
-from relative_world_ollama.entity import OllamaEntity, BasicResponse
+from relative_world_ollama.entity import OllamaEntity
+from relative_world_ollama.responses import BasicResponse
 
 
 class QueryEvent(Event):

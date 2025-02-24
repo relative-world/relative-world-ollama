@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import patch, AsyncMock
 from pydantic import BaseModel
 
-from relative_world_ollama.entity import OllamaEntity, BasicResponse
+from relative_world_ollama.entity import OllamaEntity
+from relative_world_ollama.responses import BasicResponse
 
 
 class TestResponseModel(BaseModel):

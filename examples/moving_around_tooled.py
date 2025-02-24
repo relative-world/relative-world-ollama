@@ -9,6 +9,7 @@ from relative_world.event import Event
 from relative_world.location import Location
 from relative_world.world import RelativeWorld
 from relative_world_ollama.client import PydanticOllamaClient
+from relative_world_ollama.entity import OllamaEntity
 from relative_world_ollama.settings import settings
 
 
@@ -29,13 +30,7 @@ class MovementDecision(BaseModel):
     reason: str
 
 
-class WanderingActor(Actor):
-    _ollama_client: Annotated[PydanticOllamaClient, PrivateAttr()]
-
-    def __init__(self, world: RelativeWorld, ollama_client: PydanticOllamaClient, name: str):
-        super().__init__(world=world)
-        self._ollama_client = ollama_client
-        self.name = name
+class WanderingActor(OllamaEntity, Actor):
 
     def get_location_info(self, location_id: uuid.UUID) -> dict:
         """Get information about a specific location."""
@@ -57,7 +52,7 @@ class WanderingActor(Actor):
         Decide if you want to move to a connected location or stay.
         """
 
-        response, decision = await self._ollama_client.generate(
+        response, decision = await self.ollama_client.generate(
             prompt=prompt,
             system="You are an actor in a world. Make movement decisions based on the current location.",
             response_model=MovementDecision
@@ -125,9 +120,9 @@ async def main():
 
     # Create actors
     actors = [
-        WanderingActor(world, client, name="Alice"),
-        WanderingActor(world, client, name="Bob"),
-        WanderingActor(world, client, name="Charlie"),
+        WanderingActor(name="Alice"),
+        WanderingActor(name="Bob"),
+        WanderingActor(name="Charlie"),
     ]
 
     log_actor = LoggingActor(world)

@@ -41,7 +41,7 @@ class ToolCallRequestContainer(BaseModel):
 
 
 class ToolCallResponse(BaseModel):
-    tool_call: str
+    tool_call: ToolCallRequest
     result: str
 
 
@@ -94,7 +94,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
         if parameter.default == inspect.Parameter.empty:
             required.append(name)
 
-    return FunctionSchema(
+    fs = FunctionSchema(
         function=FunctionSchemaFunction(
             name=function.__name__,
             description=function.__doc__ or "",
@@ -108,6 +108,8 @@ def function_to_schema(function: callable) -> FunctionSchema:
             required=required,
         )
     )
+    fs._callable = function
+    return fs
 
 
 def tools_to_schema(tools: dict[str, callable]) -> dict[str, FunctionSchema]:

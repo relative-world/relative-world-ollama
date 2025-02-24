@@ -6,12 +6,9 @@ from pydantic import BaseModel, PrivateAttr
 
 from relative_world.entity import Entity, BoundEvent
 from relative_world_ollama.client import get_ollama_client
+from relative_world_ollama.responses import BasicResponse
 
 logger = logging.getLogger(__name__)
-
-
-class BasicResponse(BaseModel):
-    text: str
 
 
 class OllamaEntity(Entity):
