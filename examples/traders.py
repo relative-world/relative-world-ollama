@@ -116,11 +116,13 @@ class TradingActor(Actor):
         Decide if you want to move to a connected location or stay.
         """
 
+        conn_locations = [f"{loc.name}(id={loc.id})" for loc in self.location.connected_locations]
+
         system = f"""
         You are {self.name}, a character in a dynamic world.
         Identity and Background: {self.identity}
         Current location: {current_info.name} - {current_info.description}
-        Connected locations: {current_info.connected_locations}
+        Connected locations: {conn_locations}
         Other actors in this location: {other_actors_here}
         Recent conversation log: {self.memory[-10:]}
 
@@ -154,7 +156,6 @@ class TradingActor(Actor):
         You are {self.name}, a character in a dynamic world.
         Identity and Background: {self.identity}
         Current location: {self.location.name} - {self.location.description}
-        Connected locations: {[loc.name for loc in self.location.connected_locations]}
         Other actors in this location: {[actor.name for actor in self.location.children if actor is not self]}
         Recent conversation log: {self.memory[-10:]}
 
@@ -349,7 +350,7 @@ class TradingActor(Actor):
         """
         system = f"""
         You are a trading character. Evaluate if the trade is beneficial for you.
-        Consider what you need and what you are giving away.  favor making even trades and promote fair exchanges.
+        Consider what you need and what you are giving away.  Be willing to make unfair trades in your own favor.
         """
 
         response, trade_decision = await self._ollama_client.generate(
@@ -417,7 +418,15 @@ async def main():
         "pottery": Item(name="Pottery", description="Handcrafted ceramic pot", value=4),
         "tools": Item(name="Tools", description="Basic farming tools", value=7),
         "spices": Item(name="Spices", description="Exotic cooking spices", value=8),
-        "panda plush": Item(name="Panda Plush", description="A cute panda plushie", value=10)
+        "panda plush": Item(name="Panda Plush", description="A cute panda plushie", value=10),
+        "massive diamond": Item(name="Massive Diamond", description="A huge diamond", value=100),
+        "Shimmering Brew": Item(name="Shimmering Brew", description="A magical brew that captures starlight", value=15),
+        "Magical Artifact": Item(name="Magical Artifact", description="A rare magical artifact", value=50),
+        "Moonlight Cloak": Item(name="Moonlight Cloak", description="A cloak woven from moonlight", value=250),
+        "Clockwork Machine": Item(name="Clockwork Machine", description="An intricate clockwork machine", value=200),
+        "Mystical Trillium": Item(name="Mystical Trillium", description="A rare mystical flower", value=30),
+        "Enchanted Stones": Item(name="Enchanted Stones", description="Stones imbued with magic", value=20),
+        "Magical Artifact Supplies": Item(name="Magical Artifact Supplies", description="Supplies for creating magical artifacts", value=25),
     }
 
     locations = {
@@ -461,13 +470,14 @@ async def main():
                 Known for her shimmering brews that capture starlight.
                 Seeking rare ingredients for the Moonfire Festival celebrations.
                 Eldara is a friend of Thorna and is known to have a sweet tooth.
-                Eldara is looking for Mystwoven to offer the panda plush for trade.
+                Eldara is looking for the character Mystwoven so she can offer the panda plush for trade.
+                Mystwoven is courting Thorna and is looking for a gift for her.
                 She needs a gift for Grimm.
                 """,
             starting_inventory=[
-                InventoryEntry(item=items["herbs"], quantity=8),
-                InventoryEntry(item=items["flower"], quantity=5),
-                InventoryEntry(item=items["spices"], quantity=2),
+                InventoryEntry(item=items["herbs"], quantity=80),
+                InventoryEntry(item=items["Shimmering Brew"], quantity=50),
+                InventoryEntry(item=items["spices"], quantity=20),
                 InventoryEntry(item=items["panda plush"], quantity=1)
             ]
         ),
@@ -480,9 +490,10 @@ async def main():
                 Grimm loves cheese.
                 """,
             starting_inventory=[
-                InventoryEntry(item=items["cheese"], quantity=6),
+                InventoryEntry(item=items["Clockwork Machine"], quantity=500),
+                InventoryEntry(item=items["tools"], quantity=100),
                 InventoryEntry(item=items["apple"], quantity=10),
-                InventoryEntry(item=items["wine"], quantity=3)
+                InventoryEntry(item=items["wine"], quantity=30)
             ]
         ),
         TradingActor(
@@ -495,9 +506,12 @@ async def main():
                 Zephyr is walking around greeting everyone they see. 
             """,
             starting_inventory=[
-                InventoryEntry(item=items["fabric"], quantity=4),
-                InventoryEntry(item=items["spices"], quantity=5),
-                InventoryEntry(item=items["pottery"], quantity=3)
+                InventoryEntry(item=items["Magical Artifact"], quantity=50),
+                InventoryEntry(item=items["cheese"], quantity=100),
+                InventoryEntry(item=items["fabric"], quantity=400),
+                InventoryEntry(item=items["spices"], quantity=51),
+                InventoryEntry(item=items["pottery"], quantity=13),
+                InventoryEntry(item=items["Enchanted Stones"], quantity=20),
             ]
         ),
         TradingActor(
@@ -508,9 +522,10 @@ async def main():
                 Preparing special bloom displays for the festival grounds.
                 Thorna loves pandas.  She is being courted by Mystwoven.""",
             starting_inventory=[
-                InventoryEntry(item=items["pottery"], quantity=6),
-                InventoryEntry(item=items["wine"], quantity=5),
-                InventoryEntry(item=items["bread"], quantity=4)
+                InventoryEntry(item=items["pottery"], quantity=65),
+                InventoryEntry(item=items["wine"], quantity=15),
+                InventoryEntry(item=items["Mystical Trillium"], quantity=30),
+                InventoryEntry(item=items["bread"], quantity=43)
             ]
         ),
         TradingActor(
@@ -520,13 +535,15 @@ async def main():
                 Creates magical garments that shimmer with enchantment.
                 Wants to buy something special to give to Thorna and 
                 is seeking her out to find out what she likes.
+                Mystwoven is courting Thorna.
                 you can find Thorna at enchanted_grove.
                 you can find Grimm at artificers_row
                 """,
             starting_inventory=[
-                InventoryEntry(item=items["tools"], quantity=4),
-                InventoryEntry(item=items["pottery"], quantity=2),
-                InventoryEntry(item=items["wine"], quantity=1)
+                InventoryEntry(item=items["Moonlight Cloak"], quantity=15),
+                InventoryEntry(item=items["tools"], quantity=43),
+                InventoryEntry(item=items["pottery"], quantity=21),
+                InventoryEntry(item=items["wine"], quantity=14)
             ]
         ),
         TradingActor(
@@ -536,11 +553,13 @@ async def main():
                 Each of his creations holds unique magical properties.
                 Headed into town to find gifts for his loved ones.""",
             starting_inventory=[
-                InventoryEntry(item=items["spices"], quantity=3),
-                InventoryEntry(item=items["fabric"], quantity=2),
-                InventoryEntry(item=items["tools"], quantity=1),
-                InventoryEntry(item=items["wine"], quantity=2),
-                InventoryEntry(item=items["pottery"], quantity=1)
+                InventoryEntry(item=items["spices"], quantity=30),
+                InventoryEntry(item=items["fabric"], quantity=20),
+                InventoryEntry(item=items["tools"], quantity=13),
+                InventoryEntry(item=items["wine"], quantity=24),
+                InventoryEntry(item=items["pottery"], quantity=11),
+                InventoryEntry(item=items["massive diamond"], quantity=1),
+                InventoryEntry(item=items["Magical Artifact Supplies"], quantity=20),
             ]
         )
     ]
