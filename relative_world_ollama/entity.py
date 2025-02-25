@@ -1,5 +1,5 @@
 import logging
-from functools import cached_property
+from functools import cached_property, partial
 from typing import ClassVar, Type, Annotated
 
 from pydantic import BaseModel, PrivateAttr
@@ -7,6 +7,7 @@ from pydantic import BaseModel, PrivateAttr
 from relative_world.entity import Entity, BoundEvent
 from relative_world_ollama.client import get_ollama_client
 from relative_world_ollama.responses import BasicResponse
+from relative_world_ollama.tools import tools_to_schema, ToolDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,15 @@ class OllamaEntity(Entity):
     def get_system_prompt(self):
         return "You are a friendly AI assistant."
 
+    async def generate_response(self, prompt, system, response_model):
+        return await self.ollama_client.generate(
+            prompt=prompt,
+            system=system,
+            response_model=response_model,
+            context=self._context,
+        )
+
+
     async def update(self):
         rendered_prompt = self.get_prompt()
         system_prompt = self.get_system_prompt()
@@ -38,11 +48,10 @@ class OllamaEntity(Entity):
         except AttributeError:
             response_model = BasicResponse
 
-        raw_response, response = await self.ollama_client.generate(
+        raw_response, response = await self.generate_response(
             prompt=rendered_prompt,
             system=system_prompt,
             response_model=response_model,
-            context=self._context,
         )
         self._context = raw_response.context
         await self.handle_response(response)
@@ -52,3 +61,26 @@ class OllamaEntity(Entity):
 
     async def handle_response(self, response: BaseModel) -> None:
         pass
+
+
+class TooledOllamaEntity(OllamaEntity):
+    _tools: Annotated[dict[str, ToolDefinition], PrivateAttr()] = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        tools = {}
+        for key, value in self.__class__.__dict__.items():
+            if callable(value) and hasattr(value, "_is_tool"):
+                tools[key] = getattr(self, key)
+
+        self._tools = tools_to_schema(tools)
+
+    async def generate_response(self, prompt, system, response_model):
+        response = await self.ollama_client.generate(
+            prompt=prompt,
+            system=system,
+            response_model=response_model,
+            context=self._context,
+            tools=self._tools,
+        )
+        return response

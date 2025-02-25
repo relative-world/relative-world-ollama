@@ -5,6 +5,7 @@ from typing import Any, Annotated
 
 from pydantic import BaseModel, PrivateAttr
 
+
 logger = logging.getLogger(__name__)
 
 TOOL_CALLING_SYSTEM_PROMPT = """
@@ -42,7 +43,7 @@ class ToolCallRequestContainer(BaseModel):
 
 class ToolCallResponse(BaseModel):
     tool_call: ToolCallRequest
-    result: str
+    result: Any
 
 
 class FunctionSchemaFunction(BaseModel):
@@ -91,7 +92,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
     signature = inspect.signature(function)
     required = []
     for name, parameter in signature.parameters.items():
-        if parameter.default == inspect.Parameter.empty:
+        if parameter.default == inspect.Parameter.empty and name != 'self':
             required.append(name)
 
     fs = FunctionSchema(
@@ -104,6 +105,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
                     "description": parameter.annotation.__name__,
                 }
                 for name, parameter in signature.parameters.items()
+                if name != 'self'
             },
             required=required,
         )
@@ -116,9 +118,7 @@ def tools_to_schema(tools: dict[str, callable]) -> dict[str, FunctionSchema]:
     """It'll do it's best to convert a function to a schema."""
     result = {}
     for name, function in tools.items():
-        if not hasattr(function, "_tool_schema"):
-            function._tool_schema = function_to_schema(function)
-        result[name] = function._tool_schema
+        result[name] = function_to_schema(function)
     return result
 
 
@@ -133,3 +133,9 @@ def call_tool(tools, tool_call):
         tool_call=tool_call,
         result=result,
     )
+
+
+def tool(func):
+    """Decorator to make a function as a tool"""
+    func._is_tool = True
+    return func

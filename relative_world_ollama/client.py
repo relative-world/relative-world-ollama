@@ -121,7 +121,6 @@ class PydanticOllamaClient:
             f"\n{system}\n\nOnly respond with json content, any text outside of the structure will break the system. "
             f"Unless making a tool call, the structured output format should match this json schema:\n{output_schema}."
         )
-
         response = await ollama_generate(
             client=self._client,
             model=model or self.default_model,
