@@ -1,4 +1,5 @@
 import asyncio
+
 from relative_world.entity import Entity
 from relative_world.event import Event
 from relative_world.world import RelativeWorld

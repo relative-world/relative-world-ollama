@@ -42,7 +42,7 @@ async def main():
 
     while True:
         prompt = input(">>> ")
-        if prompt.lower() == "Q":
+        if prompt.lower() == "q":
             break
 
         _, response = await ollama_client.generate(

@@ -18,8 +18,7 @@ class WanderingActor(Actor, TooledOllamaEntity):
         return f"""
         You are {self.name}, currently in location: {self.location.name}.
         Description: {self.location.description}
-        
-        
+                
         Connected locations: {connected_locations}
         
         """
@@ -28,10 +27,11 @@ class WanderingActor(Actor, TooledOllamaEntity):
         return (
             "You are a wandering actor in a world."
             "You can move to a new location or look around."
-            "Only invoke a tools once."
-            "If you have invoked a tool, do not invoke another."
-            "If you have already invoked a tool, return a response"
-
+            "Only invoke one tool and do it once, you will have future chances to perform tool calls later."
+            "If you have invoked a tool, do not invoke another, instead provide a response."
+            "Providing a response will clear the tool calls and allow you to invoke another tool on the next invocation."
+            "Other actors are also wandering around the world."
+            "If you hog the tool calls, no one else can act and the world will be dead."
         )
 
     async def handle_response(self, response):
