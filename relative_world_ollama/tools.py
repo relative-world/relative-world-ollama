@@ -92,7 +92,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
     signature = inspect.signature(function)
     required = []
     for name, parameter in signature.parameters.items():
-        if parameter.default == inspect.Parameter.empty and name != 'self':
+        if parameter.default == inspect.Parameter.empty and name not in {'self', 'actor'}:
             required.append(name)
 
     fs = FunctionSchema(
@@ -105,7 +105,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
                     "description": parameter.annotation.__name__,
                 }
                 for name, parameter in signature.parameters.items()
-                if name != 'self'
+                if name not in {'self', 'actor'}
             },
             required=required,
         )
@@ -126,6 +126,7 @@ def call_tool(tools, tool_call):
     logger.debug(f"Tool call: {tool_call}")
     try:
         function = tools[tool_call.function_name]._callable
+        print(">>> ", function)
         result = function(**(tool_call.function_args))
     except Exception:
         result = traceback.format_exc()

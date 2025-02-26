@@ -10,6 +10,7 @@ from relative_world_ollama.tools import tool
 class DescribedLocation(Location):
     description: str
 
+
 class WanderingActor(Actor, TooledOllamaEntity):
 
     def get_prompt(self):

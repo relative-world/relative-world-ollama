@@ -1,5 +1,5 @@
 import logging
-from functools import cached_property, partial
+from functools import cached_property
 from typing import ClassVar, Type, Annotated
 
 from pydantic import BaseModel, PrivateAttr
@@ -36,7 +36,6 @@ class OllamaEntity(Entity):
             context=self._context,
         )
 
-
     async def update(self):
         rendered_prompt = self.get_prompt()
         system_prompt = self.get_system_prompt()
@@ -63,7 +62,7 @@ class OllamaEntity(Entity):
         pass
 
 
-class TooledOllamaEntity(OllamaEntity):
+class TooledMixin:
     _tools: Annotated[dict[str, ToolDefinition], PrivateAttr()] = {}
 
     def __init__(self, *args, **kwargs):
@@ -74,6 +73,9 @@ class TooledOllamaEntity(OllamaEntity):
                 tools[key] = getattr(self, key)
 
         self._tools = tools_to_schema(tools)
+
+
+class TooledOllamaEntity(TooledMixin, OllamaEntity):
 
     async def generate_response(self, prompt, system, response_model):
         response = await self.ollama_client.generate(
