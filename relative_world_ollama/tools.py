@@ -136,6 +136,6 @@ def call_tool(tools, tool_call):
 
 
 def tool(func):
-    """Decorator to make a function as a tool"""
+    """Decorator to mark a function as a tool"""
     func._is_tool = True
     return func
