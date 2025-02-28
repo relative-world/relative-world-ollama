@@ -1,6 +1,7 @@
 import inspect
 import logging
 import traceback
+from functools import wraps
 from typing import Any, Annotated
 
 from pydantic import BaseModel, PrivateAttr
@@ -11,24 +12,20 @@ logger = logging.getLogger(__name__)
 TOOL_CALLING_SYSTEM_PROMPT = """
 [TOOLS]{tool_definitions_json}[/TOOLS]
 
-To call a tool use the following format:
+To call a tool, include the following in your response:
 
 ```
 {{
-    "tool_calls": [
-        {{
-            "function_name": <function name>,
-            "function_args: <object with function arguments>
-        }},
-        {{
-            "function_name": <function name>,
-            "function_args: <object with function arguments>
-        }}
-    ]
+    "tool_call": {{
+        "function_name": <function name>,
+        "function_args: <object with function arguments>
+    }}
 }}
 ```
-Previous tool invocations will be rendered in the TOOL_INVOCATIONS section of the system prompt.
-[TOOL_INVOCATIONS]{previous_tool_invocations}[/TOOL_INVOCATIONS]
+You will be allowed a single tool call and a single response per iteration.
+The output of your tool call will be provided to you in the next iteration.
+On the next iteration, any state changes induced by tool calls will be reflected in your world.
+If you do not wish to call a tool, simply provide a response.
 """
 
 
@@ -126,7 +123,6 @@ def call_tool(tools, tool_call):
     logger.debug(f"Tool call: {tool_call}")
     try:
         function = tools[tool_call.function_name]._callable
-        print(">>> ", function)
         result = function(**(tool_call.function_args))
     except Exception:
         result = traceback.format_exc()
@@ -140,3 +136,12 @@ def tool(func):
     """Decorator to mark a function as a tool"""
     func._is_tool = True
     return func
+
+
+def wrap_with_actor(func, actor):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # First argument (self) is the location instance
+        return func(*args, actor=actor, **kwargs)
+
+    return wrapper

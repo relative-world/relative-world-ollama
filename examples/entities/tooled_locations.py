@@ -1,5 +1,5 @@
 import uuid
-from functools import wraps
+from collections import Counter
 from typing import Annotated
 
 from pydantic import PrivateAttr, computed_field
@@ -11,16 +11,7 @@ from relative_world.location import Location
 from relative_world.world import RelativeWorld
 from relative_world_ollama.entity import TooledMixin, OllamaEntity
 from relative_world_ollama.responses import BasicResponse
-from relative_world_ollama.tools import tool, tools_to_schema
-
-
-def wrap_with_actor(func, actor):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        # First argument (self) is the location instance
-        return func(*args, actor=actor, **kwargs)
-
-    return wrapper
+from relative_world_ollama.tools import tool, tools_to_schema, wrap_with_actor
 
 
 class GymClassEvent(Event):
@@ -79,13 +70,10 @@ def render_events(event_buffer):
     output = []
     for event in event_buffer:
         if isinstance(event, MoveEvent):
-            print(f"\n🚶 Movement: {event.actor.name} moving from {event.from_location} to {event.to_location}")
             output.append(f"{event.actor.name} moved from {event.from_location} to {event.to_location}")
         if isinstance(event, StatementEvent):
-            print(f"\n💬 Statement: {event.speaker}: {event.statement}")
             output.append(f"{event.speaker}: {event.statement}")
         else:
-            print(f"\n🗨️ Event: {event}")
             output.append(f"{event}")
     return "\n".join(output)
 
@@ -95,6 +83,7 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
     _recent_events: Annotated[list[Event], PrivateAttr()] = []
     _event_buffer: Annotated[list[Event], PrivateAttr()] = []
     _location_tools: Annotated[dict[str, str], PrivateAttr()] = {}
+    _gained_attributes: Annotated[Counter, PrivateAttr(default_factory=Counter)]
 
     def get_system_prompt(self):
         connected_locations = ", ".join(
@@ -105,12 +94,11 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
         location_children = self.world.get_location(self.location.id).children
         if len(location_children) > 1:
             other_actors = ", ".join([
-                actor.name for actor in filter(
+                f"{actor.name} ({actor.description})" for actor in filter(
                     lambda x: isinstance(x, Actor), self.world.get_location(self.location.id).children
                 )
             ])
             other_actor_statement = f"Other actors in location: {other_actors}."
-
         else:
             other_actor_statement = "You are alone here."
 
@@ -119,10 +107,10 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
                 f"Information about your current location: {self.location.llm_describe()}. "
                 f"Connected locations: {connected_locations}. "
                 f"{other_actor_statement} ",
+                f"These are your highest ranked gained attributes: {self._gained_attributes.most_common(3)}. "
                 )
 
     def get_prompt(self):
-        connected_locations = self.world.get_connected_locations(self.location.id)
         event_buffer, self._events = self._event_buffer, []
 
         recent_events = render_events(event_buffer)
@@ -132,6 +120,27 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
         return f"""{recent_events}"""
 
     async def handle_event(self, entity, event: Event):
+        if entity is self:
+            attribute_gain = None
+            if event.type == "STATEMENT":
+                print(f"🗣️ {event.speaker} said: \"{event.statement}\"")
+                attribute_gain = "talkative"
+            if event.type == "MOVE":
+                attribute_gain = "adventurous"
+            if event.type == "GYM_CLASS":
+                attribute_gain = "fit"
+            if event.type == "USE_EQUIPMENT":
+                attribute_gain = "fit"
+            if event.type == "READ_BOOK":
+                attribute_gain = "knowledgeable"
+            if event.type == "BROWSE_BOOKS":
+                attribute_gain = "knowledgeable"
+            if event.type == "PARK_ACTIVITY":
+                attribute_gain = "relaxed"
+            if event.type == "JOB_INQUIRY":
+                attribute_gain = "ambitious"
+            if attribute_gain:
+                self._gained_attributes[attribute_gain] += 1
         self._event_buffer.append(event)
 
     def render_recent_events(self):
@@ -150,6 +159,8 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
         )
 
     async def handle_response(self, response: BasicResponse) -> None:
+        if not response:
+            return
         self.emit_event(StatementEvent(speaker=self.name, statement=response.text))
 
     @computed_field
@@ -194,7 +205,7 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
     def move(self, location_id: str):
         location = self.world.get_location(uuid.UUID(location_id))
         if location:
-            print(f"\n🔄 {self.name} moved to {location.name}")
+            print(f"🔄 {self.name} moved to {location.name}")
             self.emit_event(
                 MoveEvent(
                     actor=self,
@@ -204,7 +215,7 @@ class TooledActor(Actor, TooledMixin, OllamaEntity):
             self.location = location
             return True
         else:
-            print(f"\n❌ {self.name} failed to move to {location_id}")
+            print(f"❌ {self.name} failed to move to \"{location_id}\"")
             return False
 
 
@@ -233,19 +244,19 @@ class Gym(TooledLocation):
     @tool
     def take_class(self, actor):
         actor.emit_event(GymClassEvent(actor=actor, location=self.id))
-        print(f"\n🏋️ {actor} is taking a class at {self.name}")
+        print(f"🏋️ {actor.name} is taking a class at {self.name}")
         return "Taking a class in the gym"
 
     @tool
     def use_equipment(self, actor):
         actor.emit_event(UseEquipmentEvent(actor=actor, location=self.id))
-        print(f"\n💪 {actor} is using equipment at {self.name}")
+        print(f"💪 {actor.name} is using equipment at {self.name}")
         return "Using equipment in the gym"
 
     @tool
     def inquire_about_job(self, actor):
         actor.emit_event(JobInquiryEvent(actor=actor, location=self.id))
-        print(f"\n💼 {actor.name} is inquiring about a job at {self.name}")
+        print(f"💼 {actor.name} is inquiring about a job at {self.name}")
         return f"Inquiring about a job in {self.name}"
 
 
@@ -258,19 +269,19 @@ class Library(TooledLocation):
     @tool
     def get_books(self, actor):
         actor.emit_event(BrowseBooksEvent(actor=actor, location=self.id))
-        print(f"\n📚 {actor} is browsing books at {self.name}")
+        print(f"📚 {actor.name} is browsing books at {self.name}")
         return self.books
 
     @tool
     def read_book(self, actor, book):
         actor.emit_event(ReadBookEvent(actor=actor, location=self.id, book=book))
-        print(f"\n📚 {actor.name} is reading at {self.name}")
+        print(f"📚 {actor.name} is reading at {self.name}")
         return "Reading a book in the library"
 
     @tool
     def inquire_about_job(self, actor):
         actor.emit_event(JobInquiryEvent(actor=actor, location=self.id))
-        print(f"\n💼 {actor.name} is inquiring about a job at {self.name}")
+        print(f"💼 {actor.name} is inquiring about a job at {self.name}")
         return f"Inquiring about a job at {self.name}"
 
 
@@ -282,17 +293,19 @@ class Park(TooledLocation):
     @tool
     def sit_on_bench(self, actor):
         actor.emit_event(ParkActivityEvent(actor=actor, location=self.id, activity="sitting on bench"))
+        print(f"🪑 {actor.name} is sitting on a bench in the park")
         return "Sitting on a bench in the park"
 
     @tool
     def play_with_dog(self, actor):
         actor.emit_event(ParkActivityEvent(actor=actor, location=self.id, activity="playing with dog"))
+        print(f"🐶 {actor.name} is playing with a dog in the park")
         return "Playing with a dog in the park"
 
     @tool
     def inquire_about_job(self, actor):
         actor.emit_event(JobInquiryEvent(actor=actor, location=self.id))
-        print(f"\n💼 {actor.name} is inquiring about a job at {self.name}")
+        print(f"💼 {actor.name} is inquiring about a job at {self.name}")
         return f"Inquiring about a job at {self.name}"
 
 
@@ -316,9 +329,12 @@ async def main():
         world.connect_locations(location_a.id, location_b.id)
 
     actors = [
-        TooledActor(name="Alice", description="A fitness enthusiast and yoga instructor"),
+        TooledActor(name="Alice", description="A fitness enthusiast and computer programmer"),
         TooledActor(name="Bob", description="A bookworm and body builder"),
         TooledActor(name="Charlie", description="A nature lover and author"),
+        TooledActor(name="David", description="An employee of the gym."),
+        TooledActor(name="Eve", description="Head librarian at the Library."),
+        TooledActor(name="Frank", description="A hotdog vendor at The Park."),
     ]
 
     for actor in actors:
@@ -327,6 +343,10 @@ async def main():
     actors[0].location = gym
     actors[1].location = library
     actors[2].location = park
+    actors[3].location = gym
+    actors[4].location = library
+    actors[5].location = park
+
 
     for _ in range(10):
         await world.step()
