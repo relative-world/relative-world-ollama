@@ -1,33 +1,31 @@
 import inspect
 import logging
 import traceback
+from functools import wraps
 from typing import Any, Annotated
 
 from pydantic import BaseModel, PrivateAttr
+
 
 logger = logging.getLogger(__name__)
 
 TOOL_CALLING_SYSTEM_PROMPT = """
 [TOOLS]{tool_definitions_json}[/TOOLS]
 
-To call a tool use the following format:
+To call a tool, include the following in your response:
 
 ```
 {{
-    "tool_calls": [
-        {{
-            "function_name": <function name>,
-            "function_args: <object with function arguments>
-        }},
-        {{
-            "function_name": <function name>,
-            "function_args: <object with function arguments>
-        }}
-    ]
+    "tool_call": {{
+        "function_name": <function name>,
+        "function_args: <object with function arguments>
+    }}
 }}
 ```
-Previous tool invocations will be rendered in the TOOL_INVOCATIONS section of the system prompt.
-[TOOL_INVOCATIONS]{previous_tool_invocations}[/TOOL_INVOCATIONS]
+You will be allowed a single tool call and a single response per iteration.
+The output of your tool call will be provided to you in the next iteration.
+On the next iteration, any state changes induced by tool calls will be reflected in your world.
+If you do not wish to call a tool, simply provide a response.
 """
 
 
@@ -42,7 +40,7 @@ class ToolCallRequestContainer(BaseModel):
 
 class ToolCallResponse(BaseModel):
     tool_call: ToolCallRequest
-    result: str
+    result: Any
 
 
 class FunctionSchemaFunction(BaseModel):
@@ -91,7 +89,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
     signature = inspect.signature(function)
     required = []
     for name, parameter in signature.parameters.items():
-        if parameter.default == inspect.Parameter.empty:
+        if parameter.default == inspect.Parameter.empty and name not in {'self', 'actor'}:
             required.append(name)
 
     fs = FunctionSchema(
@@ -104,6 +102,7 @@ def function_to_schema(function: callable) -> FunctionSchema:
                     "description": parameter.annotation.__name__,
                 }
                 for name, parameter in signature.parameters.items()
+                if name not in {'self', 'actor'}
             },
             required=required,
         )
@@ -116,9 +115,7 @@ def tools_to_schema(tools: dict[str, callable]) -> dict[str, FunctionSchema]:
     """It'll do it's best to convert a function to a schema."""
     result = {}
     for name, function in tools.items():
-        if not hasattr(function, "_tool_schema"):
-            function._tool_schema = function_to_schema(function)
-        result[name] = function._tool_schema
+        result[name] = function_to_schema(function)
     return result
 
 
@@ -133,3 +130,18 @@ def call_tool(tools, tool_call):
         tool_call=tool_call,
         result=result,
     )
+
+
+def tool(func):
+    """Decorator to mark a function as a tool"""
+    func._is_tool = True
+    return func
+
+
+def wrap_with_actor(func, actor):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # First argument (self) is the location instance
+        return func(*args, actor=actor, **kwargs)
+
+    return wrapper

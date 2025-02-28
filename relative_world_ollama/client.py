@@ -5,7 +5,7 @@ import orjson
 from ollama import AsyncClient as AsyncOllamaClient, GenerateResponse
 from pydantic import BaseModel
 
-from relative_world_ollama.responses import BasicResponse
+from relative_world_ollama.responses import BasicResponse, TooledResponse
 from relative_world_ollama.json import maybe_parse_json, inline_json_schema_defs, fix_json_response
 from relative_world_ollama.settings import settings
 from relative_world_ollama.tools import TOOL_CALLING_SYSTEM_PROMPT, ToolCallRequestContainer, call_tool, \
@@ -105,6 +105,9 @@ class PydanticOllamaClient:
         Returns:
             BaseModel: The validated response model.
         """
+        if tools:
+            response_model = TooledResponse[response_model]
+
         previous_tool_invocations = previous_tool_invocations or []
         output_schema = orjson.dumps(
             inline_json_schema_defs(response_model.model_json_schema())
@@ -119,9 +122,8 @@ class PydanticOllamaClient:
 
         system_message += (
             f"\n{system}\n\nOnly respond with json content, any text outside of the structure will break the system. "
-            f"Unless making a tool call, the structured output format should match this json schema:\n{output_schema}."
+            f"The structured output format should match this json schema:\n{output_schema}."
         )
-
         response = await ollama_generate(
             client=self._client,
             model=model or self.default_model,
@@ -136,21 +138,7 @@ class PydanticOllamaClient:
         except orjson.JSONDecodeError:
             data = await fix_json_response(self._client, response_text, response_model)
 
-        try:
-            tool_requests = ToolCallRequestContainer.model_validate(data)
-        except ValueError:
-            return response, response_model.model_validate(data)
-        else:
-            tool_call_results = [call_tool(tools, tool_call) for tool_call in tool_requests.tool_calls]
-            previous_tool_invocations.extend(tool_call_results)
-            return await self.generate(
-                prompt=prompt,
-                system=system,
-                response_model=response_model,
-                model=model,
-                tools=tools,
-                previous_tool_invocations=previous_tool_invocations,
-                context=context,
-            )
-
-
+        response_obj = response_model.model_validate(data)
+        if response_obj.tool_call:
+            call_tool(tools, response_obj.tool_call)
+        return response, response_obj.response
